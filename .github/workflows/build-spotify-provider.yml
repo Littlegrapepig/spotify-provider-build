@@ -1,4 +1,4 @@
-name: Build Spotify Provider experimental APK (SDK fix)
+name: Build Spotify Provider experimental APK (API 37.0 fix)
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   android-apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 75
     steps:
       - name: Set up JDK 17
@@ -20,48 +20,32 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Ubuntu GitHub-hosted runners already ship with the Android SDK.
-      # Avoid android-actions/setup-android@v3: that action failed before the build began.
-      - name: Verify preinstalled Android SDK
+      # Ubuntu 26.04 ships with Android platform 37.0 and 36.1.
+      # Android API 37 has the package name "platforms;android-37.0" (not android-37).
+      # Avoid sdkmanager unless a required platform is actually missing.
+      - name: Verify preinstalled Android SDK platforms
         shell: bash
         run: |
           set -euo pipefail
-          echo "ANDROID_HOME=${ANDROID_HOME:-}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          if [ ! -d "$SDK_ROOT" ]; then
-            echo "::error::Android SDK directory does not exist: $SDK_ROOT"
-            exit 1
-          fi
-          MANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$MANAGER" ]; then
-            echo "::error::Preinstalled sdkmanager missing: $MANAGER"
-            find "$SDK_ROOT/cmdline-tools" -maxdepth 3 -name sdkmanager -type f || true
-            exit 1
-          fi
+          echo "Android SDK: $SDK_ROOT"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "SDKMANAGER=$MANAGER" >> "$GITHUB_ENV"
-          "$MANAGER" --version
-
-      - name: Install Android SDK platforms
-        shell: bash
-        run: |
-          set -euo pipefail
-          # sdkmanager --licenses may return nonzero if all licenses are already accepted,
-          # so report it but do not mask installation failures.
-          set +o pipefail
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
-          set -o pipefail
-          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --install \
-            "platforms;android-37" \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "platform-tools"
-          test -f "$ANDROID_SDK_ROOT/platforms/android-37/android.jar" || {
-            echo "::error::Android API 37 failed to install"
+          ls -l "$SDK_ROOT/platforms" || true
+          ls -l "$SDK_ROOT/build-tools" || true
+          if [ ! -f "$SDK_ROOT/platforms/android-37.0/android.jar" ]; then
+            echo "::error::Ubuntu image lacks Android SDK 37.0; cannot build this pinned project."
             exit 1
-          }
+          fi
+          if [ ! -f "$SDK_ROOT/platforms/android-36.1/android.jar" ]; then
+            echo "::error::Ubuntu image lacks Android SDK 36.1, required by AndroidX Core 1.18.0."
+            exit 1
+          fi
+          if [ ! -d "$SDK_ROOT/build-tools/36.0.0" ]; then
+            echo "::error::Ubuntu image lacks Android build-tools 36.0.0."
+            exit 1
+          fi
+          echo 'Android SDK preflight passed (37.0 / 36.1 / build-tools 36.0.0)'
 
       - name: Clone pinned upstream source
         shell: bash
@@ -180,6 +164,26 @@ jobs:
           content = content.replace('versionCode = 4', 'versionCode = 5')
           content = content.replace('versionName = "1.0.1"', 'versionName = "1.0.2-unofficial"')
           p.write_text(content, encoding='utf-8')
+
+          # Android 17 uses a minor SDK platform (android-37.0). Plain
+          # release(37) refers to an unavailable android-37 directory.
+          target = Path('upstream/spotify-music/build.gradle.kts')
+          data = target.read_text(encoding='utf-8')
+          old = 'version = release(rootProject.extra.get("compileSdkVersion") as Int)'
+          assert old in data, 'Spotify Gradle DSL changed; stop rather than silently skip fix'
+          data = data.replace(old,
+              'version = release(rootProject.extra.get("compileSdkVersion") as Int) { minorApiLevel = 0 }')
+          target.write_text(data, encoding='utf-8')
+
+          # AndroidX Core 1.18.0 is compiled with API 36.1. Use the exact
+          # minor version for the shared library that depends on it.
+          target = Path('upstream/share/extensions-android/build.gradle.kts')
+          data = target.read_text(encoding='utf-8')
+          assert 'version = release(36)' in data, 'Shared library SDK DSL changed'
+          data = data.replace('version = release(36)',
+                              'version = release(36) { minorApiLevel = 1 }')
+          target.write_text(data, encoding='utf-8')
+          print('Applied SDK 37.0 and 36.1 Gradle DSL fixes')
           PYTHON
 
       - name: Set up signing for local experimental build
@@ -207,7 +211,7 @@ jobs:
           android.nonTransitiveRClass=true
           kotlin.incremental=true
           EOF
-          ./gradlew :spotify-music:assembleRelease --no-daemon --stacktrace
+          ./gradlew :spotify-music:assembleRelease --no-daemon --stacktrace --console=plain
           ls -l spotify-music/build/outputs/apk/release/
 
       - name: Upload test APK
