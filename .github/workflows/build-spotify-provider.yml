@@ -1,0 +1,185 @@
+name: Build Spotify Provider experimental APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-spotify-provider.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK platforms
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "platforms;android-37" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Clone pinned upstream source
+        shell: bash
+        run: |
+          git clone https://github.com/tomakino/LyricProvider.git upstream
+          git -C upstream checkout --detach be4c131f9303966e2bb146c3e7c0665cf69585cb
+          chmod +x upstream/gradlew
+
+      - name: Apply experimental Spotify Provider patch
+        shell: bash
+        run: |
+          base64 --decode > /tmp/spotify-provider-patch.tgz <<'PATCH_BASE64'
+          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
+          Vre61a1udatb3epWt7o9rv0Pf4SEagB4AAA=
+          PATCH_BASE64
+          tar -tzf /tmp/spotify-provider-patch.tgz
+          tar -xzf /tmp/spotify-provider-patch.tgz -C upstream
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          p = Path('upstream/spotify-music/build.gradle.kts')
+          content = p.read_text(encoding='utf-8')
+          assert 'versionCode = 4' in content and 'versionName = "1.0.1"' in content, 'Unexpected upstream Spotify version'
+          content = content.replace('versionCode = 4', 'versionCode = 5')
+          content = content.replace('versionName = "1.0.1"', 'versionName = "1.0.2-unofficial"')
+          p.write_text(content, encoding='utf-8')
+          PYTHON
+
+      - name: Set up signing for local experimental build
+        shell: bash
+        run: |
+          keytool -genkeypair -keystore "$RUNNER_TEMP/spotify-provider-test.jks" \
+            -alias unofficial -storepass changeit123 -keypass changeit123 \
+            -keyalg RSA -keysize 3072 -validity 3650 \
+            -dname 'CN=Unofficial Spotify Provider test build' -noprompt
+          echo "RELEASE_STORE_FILE=$RUNNER_TEMP/spotify-provider-test.jks" >> "$GITHUB_ENV"
+          echo "RELEASE_STORE_PASSWORD=changeit123" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=unofficial" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=changeit123" >> "$GITHUB_ENV"
+
+      - name: Build signed APK
+        shell: bash
+        working-directory: upstream
+        run: |
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 -XX:+UseG1GC
+          org.gradle.parallel=false
+          org.gradle.workers.max=2
+          org.gradle.daemon=false
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          kotlin.incremental=true
+          EOF
+          ./gradlew :spotify-music:assembleRelease --no-daemon --stacktrace
+          ls -l spotify-music/build/outputs/apk/release/
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotifyProvider-1.0.2-UNOFFICIAL-test
+          path: upstream/spotify-music/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
