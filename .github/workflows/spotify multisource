@@ -1,0 +1,262 @@
+name: Build Spotify Provider 1.0.3 MultiSource test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-spotify-multisource.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 65
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Check Android SDK 37.0 and 36.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          test -f "$SDK_ROOT/platforms/android-37.0/android.jar"
+          test -f "$SDK_ROOT/platforms/android-36.1/android.jar"
+          test -d "$SDK_ROOT/build-tools/36.0.0"
+          echo 'SDK platforms found'
+      - name: Clone pinned LyricProvider source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/tomakino/LyricProvider.git upstream
+          git -C upstream checkout --detach be4c131f9303966e2bb146c3e7c0665cf69585cb
+          chmod +x upstream/gradlew
+      - name: Overlay MultiSource provider source and Gradle fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d >/tmp/multi-source-patch.tar.gz <<'PATCH_BASE64'
+          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
+          /wPRyu13AKAAAA==
+          PATCH_BASE64
+          tar -tzf /tmp/multi-source-patch.tar.gz
+          tar -xzf /tmp/multi-source-patch.tar.gz -C upstream
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          root=Path('upstream')
+          p=root/'spotify-music/build.gradle.kts'
+          data=p.read_text(encoding='utf-8')
+          def replace_once(source,old,new):
+              if source.count(old)!=1: raise RuntimeError('Missing or duplicated source pattern: '+old)
+              return source.replace(old,new)
+          data=replace_once(data,'versionCode = 4','versionCode = 6')
+          data=replace_once(data,'versionName = "1.0.1"','versionName = "1.0.3-multisource"')
+          data=replace_once(data,'version = release(rootProject.extra.get("compileSdkVersion") as Int)',
+            'version = release(rootProject.extra.get("compileSdkVersion") as Int) { minorApiLevel = 0 }')
+          data=replace_once(data,'implementation(project(":share:extensions-android"))',
+            'implementation(project(":share:extensions-android"))\n    implementation(project(":share:cloudlyric"))')
+          p.write_text(data,encoding='utf-8')
+          p=root/'share/extensions-android/build.gradle.kts'
+          data=p.read_text(encoding='utf-8')
+          data=replace_once(data,'version = release(36)','version = release(36) { minorApiLevel = 1 }')
+          p.write_text(data,encoding='utf-8')
+          p=root/'settings.gradle.kts'
+          lines=p.read_text(encoding='utf-8').splitlines(keepends=True)
+          required={':spotify-music', ':share:extensions-kt', ':share:extensions-android',
+                   ':share:cloudlyric', ':share:lrckit', ':share:qrckit'}
+          seen=set()
+          output=[]
+          for line in lines:
+              st=line.strip()
+              if st.startswith('include('):
+                  matches={name for name in required if ('"'+name+'"') in st}
+                  if not matches: continue
+                  seen.update(matches)
+              output.append(line)
+          if seen != required: raise RuntimeError('Missing Gradle modules: '+str(required-seen))
+          p.write_text(''.join(output),encoding='utf-8')
+          print('MultiSource overlay applied; required modules:',sorted(seen))
+          PYTHON
+      - name: Prepare isolated signing key
+        shell: bash
+        run: |
+          keytool -genkeypair -keystore "$RUNNER_TEMP/spotify-provider-multisource.jks" \
+            -alias unofficial -storepass changeit123 -keypass changeit123 \
+            -keyalg RSA -keysize 3072 -validity 3650 \
+            -dname 'CN=Unofficial Spotify Provider MultiSource test build' -noprompt
+          echo "RELEASE_STORE_FILE=$RUNNER_TEMP/spotify-provider-multisource.jks" >> "$GITHUB_ENV"
+          echo "RELEASE_STORE_PASSWORD=changeit123" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=unofficial" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=changeit123" >> "$GITHUB_ENV"
+      - name: Build signed MultiSource APK
+        shell: bash
+        working-directory: upstream
+        run: |
+          set -o pipefail
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 -XX:+UseG1GC
+          org.gradle.parallel=false
+          org.gradle.workers.max=2
+          org.gradle.daemon=false
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          kotlin.incremental=true
+          EOF
+          ./gradlew :spotify-music:assembleRelease --no-daemon --stacktrace --console=plain 2>&1 | tee "$RUNNER_TEMP/multisource-build.log"
+          ls -l spotify-music/build/outputs/apk/release/
+      - name: Save diagnostics if failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MultiSource-build-diagnostics
+          path: ${{ runner.temp }}/multisource-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload MultiSource APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotifyProvider-1.0.3-MultiSource-test
+          path: upstream/spotify-music/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
