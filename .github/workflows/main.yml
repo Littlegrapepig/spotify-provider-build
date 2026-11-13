@@ -396,6 +396,46 @@ jobs:
           base64 -d /tmp/spotify-v05.b64 | tar -xJf -
           rm -f app/src/main/java/io/github/playcountsort/MainActivity.java
           test -s app/src/main/java/io/github/playcountsort/NativeSheetInjector.java
+     
+      - name: Fix LSPosed early Handler crash (v0.5.1)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/io/github/playcountsort/SpotifyHook.java')
+          s=p.read_text()
+          changes=[
+            ('private static final Handler MAIN=new Handler(Looper.getMainLooper());',
+             '''private static void postMainDelayed(Runnable r,long ms){
+              Looper looper=Looper.getMainLooper();
+              if(looper!=null)new Handler(looper).postDelayed(r,ms);
+              else XposedBridge.log("PlayCountSort: main Looper unavailable");
+            }'''),
+            ('MAIN.postDelayed(', 'postMainDelayed('),
+            ('private final Handler handler=new Handler(Looper.getMainLooper());',
+             '''private Handler handler;
+              private Handler getHandler(){
+                if(handler==null){
+                  Looper l=Looper.getMainLooper();
+                  if(l==null)return null;
+                  handler=new Handler(l);
+                }
+                return handler;
+              }'''),
+            ('handler.removeCallbacks(ticker);',
+             'Handler h=getHandler(); if(h==null)return; h.removeCallbacks(ticker);'),
+            ('handler.postDelayed(ticker,', 'h.postDelayed(ticker,')
+          ]
+          for old,new in changes:
+              if old not in s: raise RuntimeError('Patch did not match: '+old)
+              s=s.replace(old,new)
+          p.write_text(s)
+          b=Path('app/build.gradle')
+          t=b.read_text().replace('versionCode 5','versionCode 6').replace('0.5.0-window-aware','0.5.1-looper-fix')
+          if t==b.read_text(): raise RuntimeError('Missing version fields')
+          b.write_text(t)
+          print('LSPosed Handler crash fixed')
+          PY
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
