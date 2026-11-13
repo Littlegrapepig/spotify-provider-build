@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '.github/workflows/build-playcount-native.yml'
+      - '.github/workflows/main.yml'
 permissions:
   contents: write
 jobs:
