@@ -436,6 +436,77 @@ jobs:
           b.write_text(t)
           print('LSPosed Handler crash fixed')
           PY
+          
+      - name: Fix Spotify Sort click detection (v0.5.2)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/io/github/playcountsort/SpotifyHook.java')
+          s=p.read_text()
+          key='            Class<?> click=XposedHelpers.findClass("p.x091",pkg.classLoader);'
+          assert s.count(key)==1, 'Expected Spotify v0.5.x source not found'
+          hook='''            // Observe real Android clicks without blocking Spotify.
+            XposedBridge.hookAllMethods(View.class,"performClick",new XC_MethodHook(){
+                @Override protected void beforeHookedMethod(MethodHookParam p){
+                    if(!(p.thisObject instanceof View))return;
+                    View pressed=(View)p.thisObject;
+                    View candidate=pressed;
+                    boolean sort=false;
+                    for(int depth=0;candidate!=null&&depth<6;depth++){
+                        if(BUTTON.equals(candidate.getClass().getName())){sort=true;break;}
+                        if(candidate instanceof android.widget.TextView){
+                            CharSequence label=((android.widget.TextView)candidate).getText();
+                            if(label!=null&&"sort".equalsIgnoreCase(label.toString().trim())){
+                                sort=true;break;
+                            }
+                        }
+                        CharSequence cd=candidate.getContentDescription();
+                        if(cd!=null&&"sort".equalsIgnoreCase(cd.toString().trim())){
+                            sort=true;break;
+                        }
+                        android.view.ViewParent parent=candidate.getParent();
+                        candidate=parent instanceof View?(View)parent:null;
+                    }
+                    if(!sort||!pressed.isAttachedToWindow())return;
+                    anchor=new WeakReference<>(pressed);
+                    armedAt=SystemClock.uptimeMillis();
+                    PREVIOUS_ROOTS.clear();
+                    for(View root:windowRoots())PREVIOUS_ROOTS.put(root,Boolean.TRUE);
+                    XposedBridge.log("PlayCountSort v052 actual Sort click detected roots="+PREVIOUS_ROOTS.size());
+                    for(long delay:new long[]{80,220,500,900,1400})
+                        postMainDelayed(()->scanWindows(pressed),delay);
+                }
+            });
+            // Observe the original Spotify Sort by sheet header.
+            XposedBridge.hookAllMethods(android.widget.TextView.class,"setText",new XC_MethodHook(){
+                @Override protected void afterHookedMethod(MethodHookParam p){
+                    if(p.args.length==0||!(p.args[0] instanceof CharSequence))return;
+                    if(!"sort by".equalsIgnoreCase(p.args[0].toString().trim()))return;
+                    final View header=(View)p.thisObject;
+                    XposedBridge.log("PlayCountSort v052 observed native Sort by header");
+                    for(long delay:new long[]{100,300,700}){
+                        postMainDelayed(()->{
+                            if(!header.isAttachedToWindow())return;
+                            try{
+                                boolean added=NativeSheetInjector.attachToRoot(header.getRootView(),false,
+                                    (period,asc)->sort(header,period,asc));
+                                if(added)XposedBridge.log("PlayCountSort v052 native sort header attached");
+                            }catch(Throwable error){XposedBridge.log("PlayCountSort v052 header: "+error);}
+                        },delay);
+                    }
+                }
+            });
+            XposedBridge.log("PlayCountSort v052 platform click hook active");
+          '''
+          s=s.replace(key,hook+key)
+          p.write_text(s)
+          b=Path('app/build.gradle')
+          x=b.read_text()
+          x=x.replace('versionCode 6','versionCode 7').replace('0.5.1-looper-fix','0.5.2-click-fix')
+          assert x!=b.read_text(),'Wrong module build version'
+          b.write_text(x)
+          PY
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
