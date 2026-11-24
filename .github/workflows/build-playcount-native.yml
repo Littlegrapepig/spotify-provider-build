@@ -1,96 +1,503 @@
-name: Build Spotify Last.fm Native Sort v0.7.1
+name: Build SpotifyPlus MultiSource 1.0.7 Spotify 9.2.4 Compat APK
+
 on:
   workflow_dispatch:
   push:
     paths:
-      - '.github/workflows/build-playcount-native.yml'
+      - '.github/workflows/**'
+
 permissions:
-  contents: write
+  contents: read
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 90
+
     steps:
       - uses: actions/checkout@v4
-      - name: Restore fixed Android source
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Check Android SDK
         shell: bash
         run: |
-          python3 - <<'PYRESTORE'
-          import base64,io,lzma,tarfile,pathlib
-          encoded=''.join("""
-          /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4d//UXtdABcL3ASAUDIm7h19G/PyyzPs7Pg38OrWeznBvBtWH3VunhnX8ZVi1dutW8VtrRSGQpkg6g
-          BUZhYzjFPmRgpt8UDffgjB0HOwaU9vSnZYOGfNQOQP4HVJkGNgm+MamKFy+YuQp6545Aky7HdJ2hyCTuF4CfImHmrcuHNkXCiEiYzEIl6Ympgw
-          OhGJarTWPf5hQTv4WjHgYPyJhVJrLDfhZR/mdAWvr0iwlun85bJ4cERVitzY8qr04V8DwWpI6pYlt9apV00DIYHxbhf362EeiWc3VGAkxOk062
-          U36S8AuNwkAIEm2f92s2iCHA0DpIlxKkUD8EKrnvU5+T0RXpKSkV3ZLObL8HArX+nenoLpnJHJLaxPGAOZU4tvGOty5iiCVoSNTp/9n3cKOclY
-          BIidfd6YopxocLqNM1FzMx00bb99BkMeB7qWlhFPb6wT2VtE0SC3NHfDJVHjcSCLiAkebIwuugP3OqLatmED86F1gd4tdDt3+Txusa/gfurY+N
-          8wsYEr67VfztHU/8BcUJKGwgweWwMdJOUNwe45WRpPWr9NXZWDV0Gh17/BK21XSeRs8hyb0qaF0uPuwfONHmfbSe7myBe9ZM0FyAPaQ6Lsez95
-          cOJiq5HSs7mjsTTezMzvquy6iDj6pydBdWCQt6hQgp0IBqR/wFNcZ5/n37BEu4+rwkY8EDNJmwhKnJUopVVt0llilVlrH2v2tkhy7VHAi7azP/
-          dw/q8a95L1JRTIMTey86aLWoPxUCf6Ew7TvCo8HogT4kyo0nMpaj6X9GzuojqDH6btZkKrKmk06kC4ZIIVJwkLRRxzTXdIKWuDB1G6j1s2d6Ws
-          0qcG2eFSHy0HVs8sAprC6B8wIRqHPkP5d7fPM4JmRsVlax+ypxESG1z0w828FkG+SEuntXOddydDFqUltXxYXPcgB51cVLt33N/2L6VylYNrBq
-          oilKr15p4AD2mjGIPD6jeKwQ4sjJnYSqYJSlMoucreSUiGg+P9wVXdTQqzCg0mIPO635bwgz+H+PRZppv74GeuZYF50QPyTKK6ZU8x2TwJ8wIS
-          yxCVuGaedsgXApgqlEa4+QY3+AyKI94nyiqAd1gmzYcnEU223C1fHxqsXVriI9IciC6rxp98mNJU5Z2T6uNOCfRMcnOgFXiyCAOWL6ox58IbZ7
-          HQ3Srj/nfCgJY0H9yuTPA7ebHrYXxKiWeGnNj8mS4P8QrERh+MrciMnU9J7Xxzp/ayOOuq+fDeNzhIdDU+Tj+2Gnj796U29gREpb8YqahbMRV6
-          osL518bBLcx5gFWKIzQNBWgNXAQUfurNg4FhHXzsM32xlsYeW9o2ffqBKTKUKjfZ5UYycBsjPZ5cUsV4/ipYuyVvVk4hH9Uu3FNKCRx2jkt7C7
-          TqzhexY4PNN7WUSf9WAYnLMa3uZuV+0enNCvcxSff9RofaGguNFetVYtvICgq166GbF6YfvDtY//uDW0yhrzuY+IzrGtrhqdlgLMkKFoGg6Y24
-          nSw66U8Z8w2zOV3dp6GVs3cOmqXG+jz3sYeDq82Aiq29Zj0ODlK4BYn03aQ4P9dMCVUBrEecRqNhEUGirSfRC0SwgHzTQBZUjzcpJH6mUCInZZ
-          8ONkodVMNU/sD1+9HD8VORe9AeU6JCqzAIV1fyN/0RnzpvFXaFaqXKiVYEf7hb7hb3R8R7H7159yogmAhVxALcz0LvM+2weP71kL47qWuWJBS7
-          oo3gWARiBDzDzZBBtBWcF6Ig7d8vixyPVeSLTPpUTdi6kuArV84RJ+5YJjJi4At2O9MpQh8tAtAWtq6vVYYdW0h2rJDPviW+U3qQ5YgEIZw1MM
-          EPFPFNtIey3bbf6u5kwDRo6/zLJ2WxEDSCq8B4MS634/kM0S4eV+9dukrSyN7lOyMgEPg0WD8j96H+DKScZLrQnxbxR8Les6e9pl5nrrzZMVjX
-          9eBlQEEtoqI1OsYmE3AgYx8KSq8wQIwie5qDUaL1f7WjBWOGF99bJIOSAkPXNcuGmtdexBrB+4xt4Q1ifhQUP8vv1dJ+KIwjOvrit3I5iScCtr
-          xF28NLc9Kn47q4yXAdzvBkL0+IjQ6LASw4jb7zlbfahDvAqK7bi0I6f3YT0DL23oX8nzgLmdxi066d9XLJc6PP7Bc6cXmRHINxNjQDpyh/+Q5E
-          OwGQUR2pPuqp9xV4cYocNMXImTf2hOgFGXdaw9NEyEB0HaBAJ/C+VcMwAr6BwEDRLECjGSIM8aRMAw4MWAHCANBbn4yyw28DslIzxeluiW+Mtf
-          z6U2pLDlaEiukPqllyow/pZUElxwI/+HwAGLg3G6angFf7m5bk0cVlYb4oHQiVtqDxFkfh4tFbyiW3pbKICXJv3ddW3kxNBzEEC1x0psjAgMd+
-          Pv7gdbEqgRkwT91x0u4Cs/TjY8X4qSt/kIzWpa7Om0GixMHEBScd8RRClc4Q4iib9bjttEjevn0H1UCaEp9StvlgS48+JK1+qtS/ShyAl8wGXW
-          56tcuvjT65C6g4N7+H0KwZ/QiY6PutsmQeTibUlwiEhlmFVThwZ6FtDIKiw7cIWUU0ZKgr+FazJEc1BCilk81JKDDbUnQm12wcRZaR90NI49xS
-          TqrTq961W8mS7c2O5LnHRhYV4xThduhXk6UYd0TWLBOOz9V8x//StQkjbu/N2KrkWbTCxatx74dbc4jspkjfSiHn4BYRhLP1olvGLGs6XmPz9B
-          3JXf3pom3LUDsJJiAUPFX+UUCVFr8nBY/0U6lHS570axK7izxFR+9V0wbUiugrkgn61R5FBhWrBBi/hZ6AZmyQc2+57+3srIg7EMBgGPRgZ/EX
-          EDxxB9okcQl0K7m2jsjq4NujvFukW2OvmU137H87lqZFz1/hNafArxc36oDUXPQvuj4/SX4jd4zKheI7NWgJQrVVNRZKA54F5x1J6Fyooju/6h
-          2jRIlHhN2BzWGHK593rby3fa8fwXqnpI7qdiPOlb9GU8Ka+75MuPOfolqR/S4XaSuqFPQFZp7M8WJ9WONKvpE3IZq6CrqMB4jvACFGT7NF6dyH
-          2/DpbkGlwKnPN7Dw7egHa74fnGElQVvJ8B1TBTNyedCY9OeUs3b1pUanM6Qx+ODu+sqJtSrO+ypBspeJuoi8n07sEObCMwPfgQp6EF29Ac9WXP
-          Guab9UViNFQIDZLwv+J5LB4SXXiQDsNbm5Rh/Tyyp3aEkpAEi0xOhvSTVCehRlu8pyIT5F2R95hsW65gZJHSowJz0QvL4uQ5sIuOgtiu+B9qjD
-          HzgbTfXmzNKdLvcVmt26IrUZk3nIEJvHArV7Nks2p5CMMcV6Z/paXNcNsZ/+eoHfMF/ZYDy5ihCLd67eifH+1jUzvRKtTnrWF6W870bUR1Re3k
-          eR8F9lAYkWG5sggo8SRuk69igJ8zVKuIvUuOKNef5v4pRlEIAi838OSMjLurqsRnhG8tKaQ3HAvhBwrp9FtRvdYWt0Ia4a1m9uXFx8VhoSjcOp
-          3VNlnKMZOf9ICDI/v0nm+7uMtXQjjREcENGiqYYSLDvNQBmkcznkzSTMW80FGxczywb2U19ffPIOJewsKgP34kN/Dka3ea8hevQDUaDtRQaxCF
-          pBLspiGnWzZQrs/rCuPDm6Zc/z9VBDG41l85c+UdK1cEf+zpvWsNvpf49ddemJDb1EeLPcGBLLelAEhsne4zGG6agHvK6Zm2oUqpZ5FQiAgbZc
-          NmvgVI4nZDYJvkeo5kToXM0aF8RDyRglN6N2X8w+xAEa3Zudq1FyjozbPuHeBAI5qOu7ysWEr29lNGPnTXtToImoifraMhGi+itbdLlTrN89Lg
-          FnQld25QpKMfnMXjXgLSl2VvFWYeNAzQivMO8KyV9t/N0wGeHJMxT8LmMAhcHLvl3MFHEjxOqHevBNK+x2RV7VfBx2wTIlm6bOq2EoOGYqbn7r
-          3nPKKyJTmovbAlRwZNxHq6yvXSym+ONxMQAr5VHPtdBeVZ/DiTGgWkJ+5bd7wdUqkrAX9ZjbcK1xT6RYm9YujCFs+IWmojSV2F3pTRDO+O8stv
-          Tp+LUkEkwZ7YegV7c8I6ZwF0pXsdfDCjsp81GV2BNG6tld+12TWgoUgJSHjRB2I4LRogenLoM0+vDuKKdhmtPjIAJG0cJKMYFucx59bjIP3cFb
-          qUGKoqDyzm3thcsbaAoZqPoNiJDhFz1sM75sHUh+lt+DwBQPS6oa9ndknnmuZGnJx0TI+ZiG23PnrAxstt7wQ89Ne6dYQ4jGZ9lM1ZAjNltwC+
-          nzaUZuqfQZmxbMVrehtX6dV2tzHkdn+ggRDCTHUFCawtywAd5dNAdduagnDozZmfezLnH+bfnTHpq4rO1IAfDc0TmdLdkVAqfedW5PU3cnsdxq
-          pgFwBAgLh2EaMFbBvdepr/Q3vaj0givz5NzGBc155zTYS9//2dpKMwNjybWvfFcHlazvzXB/NSvM2P7n4CG7M0m11S3u24OlPWGqIonjqhFqkT
-          GKfLYh2ODBH1PKAYChEESfM6zixMjuyJdCR08ZIEQ8yK5n0ydSUeBpn3cd4NNvbc74ZNiM88uOEjVmgmE/1U+oDzKDvCxbCRWTcj2rnnSHi3W+
-          X4BEWDv0mH6JcbBt9/9lOATGtwO3AWNrnPaky0g6mygAJdT44ORfwIrhMGY21uH94yt1Q1vEU9t/2NpEJGZh7TLnktqavdsaP+Nwmu199jw3Pu
-          tqrz+H1AbyoZCSR0BHN+WPbhvlIwiv3fhfYINP8MGqmnLc8zphVG9a57JodhxKIqk9eHYH1L8dczzfO0eTZos9Zfs7C4z0Up2HCnT0gF5vEhOb
-          iulmEOpxfj0TM4cxUcSAldW+JMmdAUPkma4JJnZWdZ5uW1TMdDh3ZgbplXGDw/4jHO7S3o3UWJtG98DTYEhORBYojtgf7GYCU1yJDH7+E/T9jB
-          RBPfvoxcC5HoYTub5Pb+9nV6hXrdofwnTm9DRONOVSDjS/j2Dh2piXLSovva8PqcUAhcsOMq38W6W++sIxPmyJvg8DMabIcrBt89GfMNtX5IyB
-          HnEXxMxUdAeIHbQ1PdtHprpdqo5jpsNOw3InraQG9Vexutxzqs14BvX+EfxFue7R6z4RSho6plC3nGx7wyvNuA/ACEtdZ/avSQUUFJu7wjImAs
-          jZOzruP51YVI+RKnv76UZEeVI8CJ4a/0J4pbN6++uCc/S2W+kzw/i4OLQVkAZKdo0PmpLCwWiBL9v3V0DofAyIofaNJknVKlYRlduEKcygJhtn
-          PIvgbxhaTVVhlSCS6yhtXvsMmFfr8QCA2jY/XCY6IaOuXwSJD6MNlQ+SZmhi2qpjhiwxt1+IUHBjcZ8qt0bQ46oYhcHA/nMQDJ2pLTKRiHpmz9
-          rsJwfVuTpqwD8W66UIdIWfg6i/oI8L0PZsyT8C/bEKl+WmoNP70Ghdb8tOcFayIjwfqGVypSSptXXmxyGwt9DxfKxNVZbEnFYUve4yHBQAi90I
-          H4bPSZAK29EbFJa84GEZAb71l/q1JYgX1yjfYzoCz9knDyCs9pPUoUUoet6DR5JdItgFGwDbQ45pj2Ejkgp8+qSb5Yf6dJQ89t9oOM8XYxVz5x
-          4/Fr78anEHGg3iYIIZup3VNZeavyTc7uc+1aE5XGGt1sSsMDjAtUGap/Tf2zL3LnkGSwb40fz1bDe8hpcQq5p4wHuGRdxHbY7Fm8/t5fPwBq7B
-          Og5JHSV2yH0c/Q8VCk1rQ+rSP9UGJ3pZroHkrB3BeryKZtmVT4MrJH2WSk381iEnxYqj0M8KcE5jIHdmS1SuthWvj6sRi04aweGPWed510Yvq3
-          Wld4VSLuLwKHPBbUwIq1L8ez4DZR0WcAu5OJ1k2kQ9/waHBO9dmHkjAiPxbzQ/Sb8iTxxRSIpvvYKKFkslQDJrVb5xwAShfjEv8wfIxLZTpQC/
-          rpo0+wsodJT6p4JFx6kStJriCbgj7txveGPRe0wxeBqKoHtDcHoE43UjkqgiVwlKFzmpvHUCAnXHEL77nLD8NPGMmcFMqWCWCcGn3bor4iQ+oW
-          IhPDoDhyh0aXOlKUJsLlg/yhSTdumZcsyoU7kkEeopC99xXrex2S4qdT+W9NlY3Ii/nHwqK3CSQ863csLoayR8v8qZ2+1PAhi43+8wpF8l7UrL
-          OlBcCaItJuRJbp3EVaIhg1wVo0iTUH7nDoavLszlou8gjXDmUZn1YQ80U7G/qFQvkwH6LX4t+P9xF6xtY7+MuKP/o/Sqj2ELVH0SJ/JVYUZeq5
-          WppZtVuX4U5CyxlIiNXEEk/xzkEv/lcK5fte4YebZJHfRwx8xQ+kU0FDfHdfSIJ7EKrDvRu6QKsz99fbukgpeL+E81+ha1gzswl4Gn9y9kruA4
-          5dHfv8VvUdW1TokdteEMqiCgEnzeEdRRlkomX1AkAtnf9/Qda9djkYhQR/jP4L9bR3qTpYurv14cPPa4bNhsK6fMAXhWuUZXYXEGUuw4+vGHTy
-          iP8hm6OZUmSVYmLyAbLgOAe0nxm+FLlNf3fvWnJmApY9Im4vDnXs0ZISJtsgwQfcmfcfm6tEzhPubs3PYqUYN/5iaERkrtD0lD0XCWHvAEOPt8
-          Zp4DHyYZdX2fU+LnGyG94PpxzI7dVcwqIFQatRa8YKEG+jSeMcVhgEo+spErwhkOCceBuVzipOGFqx1APBmlbDhxc/OGJ9/Dolx10xcbk8u6s6
-          FK4HznO6JwvmISoRk2fmaFAcl9c7vVL5fPoNJLDitFcvGtGbYHdz/XZJP7zevjTk/KuDkdzTCOAhzT6zhlzKnh/4H8FCGKb0v64TkRgcCc0Yiu
-          pS+tR9NlwPmLIj2sZKLrZuJsfEfgXl8MolSisn2mTuYHNCNmCfwomkgDZBXxOEhkQt/f3GDwFlkn930BAWxatv3P0shcNnpXSJ+lLWkLx0Z9+a
-          B7DSc4cCkcD+o7Jmolh6vAl5cR1qqKaTx/0wssud2XItIk1a0ydhPzujj2RIX2X4/EzDiDQHc5UofM0hvcM9AwNU21QC/vxf1gqWSxqok4J2mn
-          kSobyiE5X4Y8jowAINunPewLOIaPdyztR7Rx5IYbSY6WrNZ4U981YtzLK3oGaXEw4K5JnHY/NXjt2gtb7yqjF5pG7iD2sfQoVpUGIboR5Dy+tj
-          OWbdLg8JetJs8hl6yr75o90PyKsFURP+nJhb4KE6hnM1N0D1wQDAeS6SdshDcgHtKoZFor7ED4rB/2llYyJbrX8kj0q3Lts43kO4WMHcKK3EE3
-          Arg0Kwh9JegM1lDsJ5Cr3MB9/orgIDuDfi1jE6LcIwmGx0Tyjv8BVTvi09Dsk/lCxq7r3vsEIfmQl1oOn5hHow+Bcj3Q7v3gBDX2yxl9U4+URw
-          WUf7djxjPeaYCq5sJx/0YJNLDO8xhtUmi1rp8tc7X151QZBFiBy2LHKbOEwgWROlT+PU6/9yzhIMbRF4Z04RhY4T3Uk3oxIzHskbUQDK3plwll
-          NmpzYybjgFlK/Fa2bqe0IXn1rYR2WFeqLFeniTxZOOJqDVFPZt/U3YUx5gyYjvQvG4/1DXLgiGVtEzqfqKFxVGCLpJE3vXEK1++c+4EBpzddHk
-          3Ea0R+0UL1tNO3nkRqS+G7aIdzlrh7WMDYyaXUTxkC0sNk7rOyvOFjVj7KmrrouZ/1T9nknH7n8fZLr9LGM9rjs5myAbrj/7o4rUba+OZYm5Bt
-          ZOTj1ukb1tzJvesT/cYJNDbOXQSm0RPnX1xAFQ7gwhnu+lfUd3V8OHtu1xHwtlkVRktLW9vGgfZiPBeI1QMoy7EN2m/6UD6+qqIIj2DECCEmuN
-          P9XbF+C765mTM8Wt1rGygqWS47TuuSAwPue9k8GoXt8LLSQeG/khTGmxYzXz4Ab0IUcOxdHsDO1bA3rnx/raPekmhQHDitEG9+Xv+XmHemGA4P
-          z6kVGd/TkSwW13Z8zTe/bZmjNCe1XwGy/VT55DdS5oftwIOPcG1HwlC4JT4yR1f11tDCpr7yDv2X4uqv0ljo+rRFMY/bS5f+Q40Z4RLCpuWJOW
-          DHx++Jg9aCpf3AGWGvWgx+UVu+aAhIQbYbAs6cHIbIUIKeS49WjuOPfKLDOLUGtU/MCsOn1KD6Ze2sdJdlnCnZv1fuB8GMBwY9GKOtG3N4ZLmg
-          /L4I42pVnE+deNpFxYYJt+cLpdBFwwlyyhuHJ0lgSEF6Nwp8DJIflTJHQ0h9MzLgIVk5HtMwSJn8l3PMZyyyNY7Wr0CkwsJFjAmV/wyxQbeUXi
-          XpUOKdlJeuew0Awb6Zg1ZF5uR9M9YWl/Un+/LumLiSpe89HOa8175k7BAcScbwYUBGwpdd6guvBXQApgQESbbnos29wYOLzAWZ1b39wQO7hbHA
-          uQhw5m2qjhVNX6zwrRmmuwXGKOvqAJAWiHGlbj6isoL6m8xU5qJWSnRw4ZDli/rEFgj5UUiXf+INe8C/xi9oqMORuhfVVOV2VhBG2oSGq4DZNh
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          if [ ! -f "$SDK_ROOT/platforms/android-37.0/android.jar" ]; then
+            SDKM="$(command -v sdkmanager || true)"
+            if [ -z "$SDKM" ]; then
+              SDKM="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+            fi
+            yes | "$SDKM" --install 'platforms;android-37.0' || true
+          fi
+          test -f "$SDK_ROOT/platforms/android-37.0/android.jar"
+
+      - name: Clone SpotifyPlus base source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v1.0.0 https://github.com/Kifranei/SpotifyPlus.git upstream
+          chmod +x upstream/gradlew
+
+      - name: Restore proven 1.0.6 MultiSource base patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import base64
+          import re
+
+          old = Path('.github/workflows/main1029night.yml').read_text(
+              encoding='utf-8'
+          )
+          match = re.search(
+              r"<<'LYRIC_PATCH_B64'\s*\n(.*?)\n\s*LYRIC_PATCH_B64",
+              old,
+              re.S
+          )
+          if not match:
+              raise SystemExit(
+                  'Cannot find existing 1.0.6 patch in main1029night.yml'
+              )
+
+          data = ''.join(
+              line.strip()
+              for line in match.group(1).splitlines()
+          )
+          Path('base106.tgz').write_bytes(
+              base64.b64decode(data, validate=True)
+          )
+          PYCODE
+
+          tar -tzf base106.tgz >/dev/null
+          tar -xzf base106.tgz
+          python3 scripts/apply.py
+
+      - name: Patch Spotify 9.2.4 playback compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          from pathlib import Path
+
+          hook = Path(
+              'upstream/app/src/main/java/dev/kifranei/spotifyplus/hook'
+          )
+
+          hook.joinpath('MediaTrackIdResolver.kt').write_text(
+              r'''package dev.kifranei.spotifyplus.hook
+
+          /** Strict Spotify identity decoding across Android metadata variants. */
+          internal object MediaTrackIdResolver {
+              private val id = Regex("^[0-9A-Za-z]{22}$")
+              private val uri = Regex("^spotify:track:([0-9A-Za-z]{22})(?:[?].*)?$", RegexOption.IGNORE_CASE)
+              private val url = Regex("^https?://open\\.spotify\\.com/(?:intl-[^/]+/)?track/([0-9A-Za-z]{22})(?:[/?#].*)?$", RegexOption.IGNORE_CASE)
+
+              fun parse(value: String?): String? {
+                  if (value.isNullOrBlank()) return null
+                  val v = value.trim()
+                  if (id.matches(v)) return v
+                  uri.matchEntire(v)?.let { return it.groupValues[1] }
+                  url.matchEntire(v)?.let { return it.groupValues[1] }
+                  return null
+              }
+
+              fun first(vararg candidates: String?): String? =
+                  candidates.firstNotNullOfOrNull(::parse)
+
+              fun normalized(value: String?): String = value.orEmpty()
+                  .trim()
+                  .lowercase(java.util.Locale.ROOT)
+                  .replace(Regex("\\s+"), " ")
+
+              fun metadataAgrees(old: String?, new: String?): Boolean =
+                  old != null &&
+                  new != null &&
+                  normalized(old) == normalized(new)
+          }''',
+              encoding='utf-8'
+          )
+
+          hook.joinpath('PlaybackHook.kt').write_text(
+              r'''package dev.kifranei.spotifyplus.hook
+
+          import android.content.BroadcastReceiver
+          import android.content.Context
+          import android.content.Intent
+          import android.content.IntentFilter
+          import android.media.MediaMetadata
+          import android.media.session.PlaybackState
+          import android.os.Build
+          import dev.kifranei.spotifyplus.util.SpotifyPlusLog
+          import java.util.concurrent.CopyOnWriteArrayList
+
+          /** Spotify 9.2 compatibility: multiple MediaSession IDs + verified ContextTrack + optional broadcast. */
+          object PlaybackHook {
+              data class Track(
+                  val id: String,
+                  val title: String?,
+                  val artist: String?,
+                  val durationMs: Long
+              )
+
+              interface Listener {
+                  fun onTrack(t: Track) {}
+                  fun onPlaybackState(s: PlaybackState) {}
+                  fun onOtherMetadata(title: String?, artist: String?) {}
+              }
+
+              private val listeners =
+                  CopyOnWriteArrayList<Listener>()
+
+              @Volatile
+              private var installed = false
+
+              @Volatile
+              private var broadcastRegistered = false
+
+              @Volatile
+              var lastTrack: Track? = null
+                  private set
+
+              fun add(l: Listener) {
+                  if (!listeners.contains(l)) listeners += l
+              }
+
+              private fun deliver(t: Track, via: String) {
+                  if (t.id == lastTrack?.id) return
+
+                  lastTrack = t
+                  TrackStore.currentUri = "spotify:track:${t.id}"
+
+                  SpotifyPlusLog.i(
+                      "playback-track id=${t.id} via=$via title=${t.title.orEmpty().take(72)}"
+                  )
+
+                  for (l in listeners) {
+                      runCatching { l.onTrack(t) }
+                          .onFailure {
+                              SpotifyPlusLog.w("playback listener failed", it)
+                          }
+                  }
+              }
+
+              private fun onMetadata(md: MediaMetadata) {
+                  val description =
+                      runCatching { md.description }.getOrNull()
+
+                  val title =
+                      md.getString(MediaMetadata.METADATA_KEY_TITLE)
+                          ?: md.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
+                          ?: description?.title?.toString()
+
+                  val artist =
+                      md.getString(MediaMetadata.METADATA_KEY_ARTIST)
+                          ?: md.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE)
+                          ?: description?.subtitle?.toString()
+
+                  val duration =
+                      md.getLong(MediaMetadata.METADATA_KEY_DURATION)
+
+                  val fromMetadata = MediaTrackIdResolver.first(
+                      md.getString(MediaMetadata.METADATA_KEY_MEDIA_ID),
+                      md.getString(MediaMetadata.METADATA_KEY_MEDIA_URI),
+                      description?.mediaId,
+                      description?.mediaUri?.toString()
+                  )
+
+                  val fromTrack =
+                      if (fromMetadata == null)
+                          TrackStore.findByMetadata(title, artist)
+                      else
+                          null
+
+                  val id = fromMetadata ?: fromTrack
+
+                  if (id != null) {
+                      deliver(
+                          Track(id, title, artist, duration),
+                          if (fromMetadata != null)
+                              "MediaSession"
+                          else
+                              "ContextTrack-match"
+                      )
+                      return
+                  }
+
+                  val previous = lastTrack
+
+                  if (
+                      previous != null &&
+                      MediaTrackIdResolver.metadataAgrees(
+                          previous.title, title
+                      ) &&
+                      MediaTrackIdResolver.metadataAgrees(
+                          previous.artist, artist
+                      )
+                  ) {
+                      SpotifyPlusLog.i(
+                          "playback metadata missing ID but matches last song; keep lyrics"
+                      )
+                      return
+                  }
+
+                  SpotifyPlusLog.w(
+                      "playback metadata missing Spotify ID: title=${title.orEmpty().take(64)} artist=${artist.orEmpty().take(64)}"
+                  )
+
+                  for (l in listeners) {
+                      runCatching {
+                          l.onOtherMetadata(title, artist)
+                      }.onFailure {
+                          SpotifyPlusLog.w("metadata listener failed", it)
+                      }
+                  }
+              }
+
+              @Synchronized
+              fun install() {
+                  if (installed) return
+                  installed = true
+
+                  val ms =
+                      android.media.session.MediaSession::class.java
+
+                  val metaHooks = ModernHookRuntime.hookAllMethods(
+                      ms,
+                      "setMetadata",
+                      object : ModernHookRuntime.MethodHook() {
+                          override fun afterHookedMethod(
+                              p: ModernHookRuntime.MethodHookParam
+                          ) {
+                              val md =
+                                  p.args.getOrNull(0) as? MediaMetadata
+                                      ?: return
+
+                              runCatching {
+                                  onMetadata(md)
+                              }.onFailure {
+                                  SpotifyPlusLog.w(
+                                      "metadata handler failed", it
+                                  )
+                              }
+                          }
+                      }
+                  )
+
+                  val stateHooks = ModernHookRuntime.hookAllMethods(
+                      ms,
+                      "setPlaybackState",
+                      object : ModernHookRuntime.MethodHook() {
+                          override fun afterHookedMethod(
+                              p: ModernHookRuntime.MethodHookParam
+                          ) {
+                              val state =
+                                  p.args.getOrNull(0) as? PlaybackState
+                                      ?: return
+
+                              for (l in listeners) {
+                                  runCatching {
+                                      l.onPlaybackState(state)
+                                  }
+                              }
+                          }
+                      }
+                  )
+
+                  SpotifyPlusLog.i(
+                      "PlaybackHook ready: MediaSession metadata=$metaHooks state=$stateHooks"
+                  )
+
+                  SpotifyHost.whenReady(::registerBroadcastFallback)
+              }
+
+              private fun registerBroadcastFallback(
+                  app: android.app.Application
+              ) {
+                  if (broadcastRegistered) return
+
+                  val receiver = object : BroadcastReceiver() {
+                      override fun onReceive(
+                          context: Context,
+                          intent: Intent
+                      ) {
+                          if (
+                              intent.action !=
+                              "com.spotify.music.metadatachanged"
+                          ) return
+
+                          val sent =
+                              intent.getLongExtra("timeSent", 0L)
+
+                          if (
+                              sent > 0L &&
+                              kotlin.math.abs(
+                                  System.currentTimeMillis() - sent
+                              ) > 60_000L
+                          ) return
+
+                          val id = MediaTrackIdResolver.parse(
+                              intent.getStringExtra("id")
+                          ) ?: return
+
+                          val title =
+                              intent.getStringExtra("track")
+
+                          val artist =
+                              intent.getStringExtra("artist")
+
+                          val sec =
+                              intent.getIntExtra("length", 0)
+                                  .coerceAtLeast(0)
+
+                          deliver(
+                              Track(
+                                  id,
+                                  title,
+                                  artist,
+                                  sec.toLong() * 1000L
+                              ),
+                              "Spotify-broadcast"
+                          )
+                      }
+                  }
+
+                  runCatching {
+                      val filter = IntentFilter(
+                          "com.spotify.music.metadatachanged"
+                      )
+
+                      if (Build.VERSION.SDK_INT >= 33) {
+                          app.registerReceiver(
+                              receiver,
+                              filter,
+                              Context.RECEIVER_EXPORTED
+                          )
+                      } else {
+                          app.registerReceiver(receiver, filter)
+                      }
+
+                      broadcastRegistered = true
+
+                      SpotifyPlusLog.i(
+                          "Spotify media broadcast fallback installed (may be disabled by Spotify settings)"
+                      )
+                  }.onFailure {
+                      SpotifyPlusLog.w(
+                          "broadcast fallback registration failed", it
+                      )
+                  }
+              }
+          }''',
+              encoding='utf-8'
+          )
+
+          def replace_one(path, old, new):
+              s = path.read_text(encoding='utf-8')
+              if s.count(old) != 1:
+                  raise SystemExit(
+                      f'Unexpected source in {path}: {old!r} occurs {s.count(old)} times'
+                  )
+              path.write_text(
+                  s.replace(old, new),
+                  encoding='utf-8'
+              )
+
+          store = hook / 'TrackStore.kt'
+
+          replace_one(
+              store,
+              'import dev.kifranei.spotifyplus.util.SpotifyPlusLog',
+              'import dev.kifranei.spotifyplus.util.SpotifyPlusLog\nimport dev.kifranei.spotifyplus.util.SpotifyUris'
+          )
+
+          replace_one(
+              store,
+              '    /** Now-playing track (from MediaSession), else the last track we saw a Canvas for. */',
+              '''    /** Exact title AND artist matching only. Ambiguous recordings are rejected. */
+              fun findByMetadata(title: String?, artist: String?): String? {
+                  if (title.isNullOrBlank() || artist.isNullOrBlank()) return null
+                  val wantedTitle = MediaTrackIdResolver.normalized(title)
+                  val wantedArtist = MediaTrackIdResolver.normalized(artist)
+                  return synchronized(lock) {
+                      map.values.asSequence().filter {
+                          MediaTrackIdResolver.normalized(it.title) == wantedTitle &&
+                              MediaTrackIdResolver.normalized(it.artistName) == wantedArtist
+                      }.mapNotNull { SpotifyUris.trackId(it.uri) }.distinct().toList().singleOrNull()
+                  }
+              }
+
+              /** Now-playing track (from MediaSession), else the last track we saw a Canvas for. */'''
+          )
+
+          entry = hook / 'HookEntry.kt'
+
+          replace_one(
+              entry,
+              '        step("PlaybackHook") { PlaybackHook.install() }',
+              '        if (prefs.lyricsBridge) step("TrackStore for lyrics") { TrackStore.install(cl) }\n'
+              '        step("PlaybackHook") { PlaybackHook.install() }'
+          )
+
+          gradle = Path('upstream/app/build.gradle.kts')
+
+          replace_one(
+              gradle,
+              'versionCode = 16',
+              'versionCode = 17'
+          )
+
+          replace_one(
+              gradle,
+              'versionName = "1.0.6-persistent-cache-beta"',
+              'versionName = "1.0.7-spotify-9.2-compat-beta"'
+          )
+
+          print(
+              'Spotify 9.2.4 compatibility applied; cache and source picker preserved.'
+          )
+          PYCODE
+
+      - name: Verify sources and build APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s upstream/app/src/main/java/dev/kifranei/spotifyplus/lyrics/LyricsDiskCache.kt
+          test -s upstream/app/src/main/java/dev/kifranei/spotifyplus/lyrics/MultiSourceLyricsClient.kt
+          test -s upstream/app/src/main/java/dev/kifranei/spotifyplus/ui/LyricsSourceActivity.kt
+          test -s upstream/app/src/main/java/dev/kifranei/spotifyplus/hook/MediaTrackIdResolver.kt
+
+          cd upstream
+
+          ./gradlew :app:assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --console=plain \
+            2>&1 | tee "$RUNNER_TEMP/spotifyplus107-build.log"
+
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotifyPlus-107-Failure-Log
+          path: ${{ runner.temp }}/spotifyplus107-build.log
+          if-no-files-found: ignore
+
+      - name: Upload 1.0.7 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotifyPlus-MultiSource-1.0.7-Spotify92-APK
+          path: upstream/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
